@@ -38,12 +38,15 @@ jobs:
         working-directory: outputs/NotificationBlaster
         run: |
           APP_PATH="$RUNNER_TEMP/NotificationBlasterDerivedData/Build/Products/Release-iphoneos/NotificationBlaster.app"
+          IPA_ROOT="$RUNNER_TEMP/NotificationBlasterIPARoot"
+          IPA_PATH="$RUNNER_TEMP/NotificationBlaster.ipa"
           test -d "$APP_PATH"
-          mkdir -p "$RUNNER_TEMP/NotificationBlasterIPARoot/Payload"
-          cp -R "$APP_PATH" "$RUNNER_TEMP/NotificationBlasterIPARoot/Payload/"
-          ditto -c -k --sequesterRsrc --keepParent \
-            "$RUNNER_TEMP/NotificationBlasterIPARoot/Payload" \
-            "$RUNNER_TEMP/NotificationBlaster.ipa"
+          mkdir -p "$IPA_ROOT/Payload"
+          cp -R "$APP_PATH" "$IPA_ROOT/Payload/"
+          (cd "$IPA_ROOT" && /usr/bin/zip -qry "$IPA_PATH" Payload)
+
+          unzip -t "$IPA_PATH"
+          unzip -Z1 "$IPA_PATH" | grep -Fxq 'Payload/NotificationBlaster.app/Info.plist'
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
@@ -52,3 +55,4 @@ jobs:
           path: ${{ runner.temp }}/NotificationBlaster.ipa
           if-no-files-found: error
           retention-days: 14
+
