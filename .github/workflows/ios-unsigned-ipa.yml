@@ -22,7 +22,7 @@ jobs:
           mkdir -p AppIcon.xcassets/AppIcon.appiconset
           mkdir -p AppIcon.xcassets/AppIconPreview.imageset
 
-          base64 --decode AppIconSource/icon96.png.b64 > AppIconSource/icon96.png
+          base64 -D -i AppIconSource/icon96.png.b64 -o AppIconSource/icon96.png
 
           sips -z 1024 1024 AppIconSource/icon96.png --out AppIcon.xcassets/AppIcon.appiconset/AppIcon-1024.png >/dev/null
           sips -z 180 180 AppIconSource/icon96.png --out AppIcon.xcassets/AppIcon.appiconset/AppIcon-60@3x.png >/dev/null
