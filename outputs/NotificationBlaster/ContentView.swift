@@ -79,7 +79,7 @@ final class Blaster: ObservableObject {
         itemCount: Int,
         store: String
     ) {
-        let title = "Order #\(orderNumber)"
+        let startingOrder = Int(orderNumber) ?? 1048
         let itemWord = itemCount == 1 ? "item" : "items"
         let body = "$\(amount), \(itemCount) \(itemWord) from \(store)"
 
@@ -89,10 +89,10 @@ final class Blaster: ObservableObject {
         status = "Queued 0 of \(queueSize)"
 
         var elapsed = 0.0
-        for identifier in runIDs {
+        for (index, identifier) in runIDs.enumerated() {
             elapsed += Double.random(in: minimum...maximum)
             let content = UNMutableNotificationContent()
-            content.title = title
+            content.title = "Order #\(startingOrder + index)"
             content.body = body
             content.sound = .default
 
