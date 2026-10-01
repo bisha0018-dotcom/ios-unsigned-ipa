@@ -13,10 +13,19 @@ final class Blaster: ObservableObject {
     private let queueSize = 60
     private var activeRunID: UUID?
 
-    func start(minimum: Double, maximum: Double, message: String) {
+    func start(minimum: Double, maximum: Double, orderNumber: String, amount: String, itemCount: Int, store: String) {
         guard !isRunning else { return }
         guard minimum > 0, maximum >= minimum else {
             status = "Enter valid delay values."
+            return
+        }
+
+        let order = orderNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let price = amount.trimmingCharacters(in: .whitespacesAndNewlines)
+        let domain = store.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !order.isEmpty, !price.isEmpty, !domain.isEmpty, itemCount > 0 else {
+            status = "Fill in the order, amount, items, and store."
             return
         }
 
@@ -35,7 +44,15 @@ final class Blaster: ObservableObject {
                     self.status = error?.localizedDescription ?? "Allow notifications in Settings to start."
                     return
                 }
-                self.schedule(runID: runID, minimum: minimum, maximum: maximum, message: message)
+                self.schedule(
+                    runID: runID,
+                    minimum: minimum,
+                    maximum: maximum,
+                    orderNumber: order,
+                    amount: price,
+                    itemCount: itemCount,
+                    store: domain
+                )
             }
         }
     }
@@ -48,11 +65,19 @@ final class Blaster: ObservableObject {
         status = "Stopped. Pending notifications cancelled."
     }
 
-    private func schedule(runID: UUID, minimum: Double, maximum: Double, message: String) {
-        let title = "Notification Blaster"
-        let body = message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? "Your notification is here."
-            : message
+    private func schedule(
+        runID: UUID,
+        minimum: Double,
+        maximum: Double,
+        orderNumber: String,
+        amount: String,
+        itemCount: Int,
+        store: String
+    ) {
+        let title = "Order #\(orderNumber)"
+        let itemWord = itemCount == 1 ? "item" : "items"
+        let body = "$\(amount), \(itemCount) \(itemWord) from \(store)"
+
         let runIDs = (0..<queueSize).map { _ in UUID().uuidString }
         identifiers = runIDs
         scheduledCount = 0
@@ -65,8 +90,10 @@ final class Blaster: ObservableObject {
             content.title = title
             content.body = body
             content.sound = .default
+
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: elapsed, repeats: false)
             let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+
             center.add(request) { [weak self] error in
                 Task { @MainActor in
                     guard let self else { return }
@@ -87,97 +114,163 @@ struct ContentView: View {
     @StateObject private var blaster = Blaster()
     @State private var minimumDelay = "0.5"
     @State private var maximumDelay = "2.5"
-    @State private var message = "Hello from Notification Blaster!"
+    @State private var orderNumber = "1048"
+    @State private var amount = "249.98"
+    @State private var itemCount = "2"
+    @State private var store = "larptom.com"
 
     private var minimum: Double { Double(minimumDelay) ?? 0 }
     private var maximum: Double { Double(maximumDelay) ?? 0 }
+    private var items: Int { Int(itemCount) ?? 0 }
     private var validDelays: Bool { minimum > 0 && maximum >= minimum }
 
     var body: some View {
-        VStack(spacing: 26) {
-            VStack(spacing: 6) {
-                Image(systemName: "bell.badge.fill")
-                    .font(.system(size: 38, weight: .medium))
-                    .foregroundStyle(.orange)
-                Text("Notification Blaster")
-                    .font(.largeTitle.bold())
-                    .multilineTextAlignment(.center)
-                Text("A burst of local notifications")
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.top, 28)
+        ScrollView {
+            VStack(spacing: 20) {
+                VStack(spacing: 6) {
+                    Image("AppIconPreview")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 72, height: 72)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
 
-            Button {
-                if blaster.isRunning { blaster.stop() }
-                else { blaster.start(minimum: minimum, maximum: maximum, message: message) }
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: blaster.isRunning ? "stop.fill" : "play.fill")
-                    Text(blaster.isRunning ? "Stop" : "Start")
+                    Text("Order Notification Simulator")
+                        .font(.title.bold())
+                        .multilineTextAlignment(.center)
+
+                    Text("Personal local-notification simulator")
+                        .foregroundStyle(.secondary)
+                        .font(.subheadline)
                 }
-                .font(.title2.bold())
-                .frame(maxWidth: .infinity)
-                .frame(height: 76)
-                .foregroundStyle(.white)
-                .background(blaster.isRunning ? Color.red : Color.orange, in: RoundedRectangle(cornerRadius: 22))
-            }
-            .disabled(!blaster.isRunning && !validDelays)
+                .padding(.top, 18)
 
-            VStack(spacing: 0) {
-                delayRow(title: "Minimum delay", value: $minimumDelay)
-                Divider()
-                delayRow(title: "Maximum delay", value: $maximumDelay)
-            }
-            .padding(.horizontal, 16)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+                Button {
+                    if blaster.isRunning {
+                        blaster.stop()
+                    } else {
+                        blaster.start(
+                            minimum: minimum,
+                            maximum: maximum,
+                            orderNumber: orderNumber,
+                            amount: amount,
+                            itemCount: items,
+                            store: store
+                        )
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: blaster.isRunning ? "stop.fill" : "play.fill")
+                        Text(blaster.isRunning ? "Stop" : "Start")
+                    }
+                    .font(.title2.bold())
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 64)
+                    .foregroundStyle(.white)
+                    .background(
+                        blaster.isRunning ? Color.red : Color.green,
+                        in: RoundedRectangle(cornerRadius: 20)
+                    )
+                }
+                .disabled(!blaster.isRunning && (!validDelays || items <= 0))
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("NOTIFICATION MESSAGE")
-                    .font(.caption.bold())
+                section("ORDER NOTIFICATION") {
+                    formRow("Order number", text: $orderNumber)
+                    Divider()
+                    formRow("Amount", text: $amount, prefix: "$")
+                    Divider()
+                    formRow("Items", text: $itemCount)
+                    Divider()
+                    formRow("Store / domain", text: $store)
+                }
+
+                section("DELIVERY") {
+                    formRow("Minimum delay", text: $minimumDelay, suffix: "sec")
+                    Divider()
+                    formRow("Maximum delay", text: $maximumDelay, suffix: "sec")
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("PREVIEW")
+                        .font(.caption.bold())
+                        .foregroundStyle(.secondary)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Order #\(orderNumber.isEmpty ? "1048" : orderNumber)")
+                            .font(.headline)
+                        Text("$\(amount.isEmpty ? "249.98" : amount), \(items == 1 ? "1 item" : "\(items) items") from \(store.isEmpty ? "larptom.com" : store)")
+                            .font(.subheadline)
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                }
+
+                HStack {
+                    Label("\(blaster.scheduledCount)", systemImage: "bell")
+                        .font(.title3.bold())
+                    Text("scheduled")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("60 per run")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(16)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+
+                Text(blaster.status)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
-                TextField("Message", text: $message, axis: .vertical)
-                    .lineLimit(2...4)
-                    .padding(14)
-                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                    .multilineTextAlignment(.center)
+                    .frame(minHeight: 22)
+
+                Text("Simulator only — notifications are generated locally on this iPhone.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, 12)
             }
-
-            HStack {
-                Label("\(blaster.scheduledCount)", systemImage: "bell")
-                    .font(.title3.bold())
-                Text("scheduled")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("60 per run")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(16)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
-
-            Text(blaster.status)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(minHeight: 22)
-
-            Spacer(minLength: 0)
+            .padding(.horizontal, 20)
         }
-        .padding(.horizontal, 22)
-        .padding(.bottom, 16)
         .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
     }
 
-    private func delayRow(title: String, value: Binding<String>) -> some View {
+    @ViewBuilder
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 8)
+
+            VStack(spacing: 0) {
+                content()
+            }
+            .padding(.horizontal, 16)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        }
+    }
+
+    private func formRow(_ title: String, text: Binding<String>, prefix: String? = nil, suffix: String? = nil) -> some View {
         HStack {
             Text(title)
             Spacer()
-            TextField("Seconds", text: value)
-                .keyboardType(.decimalPad)
+
+            if let prefix {
+                Text(prefix)
+                    .foregroundStyle(.secondary)
+            }
+
+            TextField(title, text: text)
+                .keyboardType(title == "Order number" || title == "Store / domain" ? .default : .decimalPad)
                 .multilineTextAlignment(.trailing)
-                .frame(width: 90)
-            Text("sec")
-                .foregroundStyle(.secondary)
+                .frame(width: 130)
+
+            if let suffix {
+                Text(suffix)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .padding(.vertical, 16)
+        .padding(.vertical, 15)
     }
 }
