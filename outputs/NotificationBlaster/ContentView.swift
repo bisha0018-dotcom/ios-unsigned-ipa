@@ -79,7 +79,7 @@ final class Blaster: ObservableObject {
         itemCount: Int,
         store: String
     ) {
-        let startingOrder = Int(orderNumber) ?? 1048
+        let startingOrder = Int(orderNumber) ?? 1001
         let itemWord = itemCount == 1 ? "item" : "items"
         let body = "$\(amount), \(itemCount) \(itemWord) from \(store)"
 
@@ -119,10 +119,10 @@ struct ContentView: View {
     @StateObject private var blaster = Blaster()
     @State private var minimumDelay = "0.5"
     @State private var maximumDelay = "2.5"
-    @State private var orderNumber = "1048"
+    @State private var orderNumber = "1001"
     @State private var amount = "249.98"
     @State private var itemCount = "2"
-    @State private var store = "larptom.com"
+    @State private var store = "Paya Ecom"
 
     private var minimum: Double { Double(minimumDelay) ?? 0 }
     private var maximum: Double { Double(maximumDelay) ?? 0 }
@@ -200,9 +200,9 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Order #\(orderNumber.isEmpty ? "1048" : orderNumber)")
+                        Text("Order #\(orderNumber.isEmpty ? "1001" : orderNumber)")
                             .font(.headline)
-                        Text("$\(amount.isEmpty ? "249.98" : amount), \(items == 1 ? "1 item" : "\(items) items") from \(store.isEmpty ? "larptom.com" : store)")
+                        Text("$\(amount.isEmpty ? "249.98" : amount), \(items == 1 ? "1 item" : "\(items) items") from \(store.isEmpty ? "Paya Ecom" : store)")
                             .font(.subheadline)
                     }
                     .padding(16)
