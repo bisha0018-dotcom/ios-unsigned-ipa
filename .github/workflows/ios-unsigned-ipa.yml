@@ -9,12 +9,66 @@ permissions:
 
 jobs:
   build:
-    name: Build Notification Blaster for iPhone
+    name: Build Order Notification Simulator for iPhone
     runs-on: macos-15
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Prepare app icon
+        working-directory: outputs/NotificationBlaster
+        run: |
+          mkdir -p AppIcon.xcassets/AppIcon.appiconset
+          mkdir -p AppIcon.xcassets/AppIconPreview.imageset
+
+          base64 --decode AppIconSource/icon96.png.b64 > AppIconSource/icon96.png
+
+          sips -z 1024 1024 AppIconSource/icon96.png --out AppIcon.xcassets/AppIcon.appiconset/AppIcon-1024.png >/dev/null
+          sips -z 180 180 AppIconSource/icon96.png --out AppIcon.xcassets/AppIcon.appiconset/AppIcon-60@3x.png >/dev/null
+          sips -z 120 120 AppIconSource/icon96.png --out AppIcon.xcassets/AppIcon.appiconset/AppIcon-60@2x.png >/dev/null
+          sips -z 120 120 AppIconSource/icon96.png --out AppIcon.xcassets/AppIcon.appiconset/AppIcon-40@3x.png >/dev/null
+          sips -z 80 80 AppIconSource/icon96.png --out AppIcon.xcassets/AppIcon.appiconset/AppIcon-40@2x.png >/dev/null
+          sips -z 87 87 AppIconSource/icon96.png --out AppIcon.xcassets/AppIcon.appiconset/AppIcon-29@3x.png >/dev/null
+          sips -z 58 58 AppIconSource/icon96.png --out AppIcon.xcassets/AppIcon.appiconset/AppIcon-29@2x.png >/dev/null
+          sips -z 60 60 AppIconSource/icon96.png --out AppIcon.xcassets/AppIcon.appiconset/AppIcon-20@3x.png >/dev/null
+          sips -z 40 40 AppIconSource/icon96.png --out AppIcon.xcassets/AppIcon.appiconset/AppIcon-20@2x.png >/dev/null
+          sips -z 152 152 AppIconSource/icon96.png --out AppIcon.xcassets/AppIcon.appiconset/AppIcon-76@2x.png >/dev/null
+          sips -z 167 167 AppIconSource/icon96.png --out AppIcon.xcassets/AppIcon.appiconset/AppIcon-83.5@2x.png >/dev/null
+
+          cp AppIconSource/icon96.png AppIcon.xcassets/AppIconPreview.imageset/icon.png
+
+          cat > AppIcon.xcassets/Contents.json <<'EOF'
+          {"info":{"author":"xcode","version":1}}
+          EOF
+
+          cat > AppIcon.xcassets/AppIcon.appiconset/Contents.json <<'EOF'
+          {
+            "images" : [
+              { "filename" : "AppIcon-20@2x.png", "idiom" : "iphone", "scale" : "2x", "size" : "20x20" },
+              { "filename" : "AppIcon-20@3x.png", "idiom" : "iphone", "scale" : "3x", "size" : "20x20" },
+              { "filename" : "AppIcon-29@2x.png", "idiom" : "iphone", "scale" : "2x", "size" : "29x29" },
+              { "filename" : "AppIcon-29@3x.png", "idiom" : "iphone", "scale" : "3x", "size" : "29x29" },
+              { "filename" : "AppIcon-40@2x.png", "idiom" : "iphone", "scale" : "2x", "size" : "40x40" },
+              { "filename" : "AppIcon-40@3x.png", "idiom" : "iphone", "scale" : "3x", "size" : "40x40" },
+              { "filename" : "AppIcon-60@2x.png", "idiom" : "iphone", "scale" : "2x", "size" : "60x60" },
+              { "filename" : "AppIcon-60@3x.png", "idiom" : "iphone", "scale" : "3x", "size" : "60x60" },
+              { "filename" : "AppIcon-76@2x.png", "idiom" : "ipad", "scale" : "2x", "size" : "76x76" },
+              { "filename" : "AppIcon-83.5@2x.png", "idiom" : "ipad", "scale" : "2x", "size" : "83.5x83.5" },
+              { "filename" : "AppIcon-1024.png", "idiom" : "ios-marketing", "scale" : "1x", "size" : "1024x1024" }
+            ],
+            "info" : { "author" : "xcode", "version" : 1 }
+          }
+          EOF
+
+          cat > AppIcon.xcassets/AppIconPreview.imageset/Contents.json <<'EOF'
+          {
+            "images" : [
+              { "filename" : "icon.png", "idiom" : "universal", "scale" : "1x" }
+            ],
+            "info" : { "author" : "xcode", "version" : 1 }
+          }
+          EOF
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -39,7 +93,7 @@ jobs:
         run: |
           APP_PATH="$RUNNER_TEMP/NotificationBlasterDerivedData/Build/Products/Release-iphoneos/NotificationBlaster.app"
           IPA_ROOT="$RUNNER_TEMP/NotificationBlasterIPARoot"
-          IPA_PATH="$RUNNER_TEMP/NotificationBlaster.ipa"
+          IPA_PATH="$RUNNER_TEMP/OrderNotificationSimulator.ipa"
           test -d "$APP_PATH"
           mkdir -p "$IPA_ROOT/Payload"
           cp -R "$APP_PATH" "$IPA_ROOT/Payload/"
@@ -70,8 +124,7 @@ jobs:
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NotificationBlaster-unsigned-ipa
-          path: ${{ runner.temp }}/NotificationBlaster.ipa
+          name: OrderNotificationSimulator-unsigned-ipa
+          path: ${{ runner.temp }}/OrderNotificationSimulator.ipa
           if-no-files-found: error
           retention-days: 14
-
