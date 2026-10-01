@@ -35,7 +35,11 @@ final class Blaster: ObservableObject {
         isRunning = true
         status = "Requesting notification permission…"
 
-        center.setNotificationCategories([\n            UNNotificationCategory(identifier: notificationCategory, actions: [], intentIdentifiers: [], options: [])\n        ])\n\n        center.requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] granted, error in
+        center.setNotificationCategories([
+            UNNotificationCategory(identifier: notificationCategory, actions: [], intentIdentifiers: [], options: [])
+        ])
+
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] granted, error in
             Task { @MainActor in
                 guard let self else { return }
                 guard self.activeRunID == runID else { return }
