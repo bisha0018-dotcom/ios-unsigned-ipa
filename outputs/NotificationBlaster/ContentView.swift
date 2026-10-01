@@ -8,7 +8,7 @@ final class Blaster: ObservableObject {
     @Published var scheduledCount = 0
     @Published var status = "Ready"
 
-    private let center = UNUserNotificationCenter.current()
+    private let center = UNUserNotificationCenter.current()\n    private let notificationCategory = "ORDER_SIMULATOR"
     private var identifiers: [String] = []
     private let queueSize = 60
     private var activeRunID: UUID?
@@ -34,7 +34,7 @@ final class Blaster: ObservableObject {
         isRunning = true
         status = "Requesting notification permission…"
 
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] granted, error in
+        center.setNotificationCategories([\n            UNNotificationCategory(identifier: notificationCategory, actions: [], intentIdentifiers: [], options: [])\n        ])\n\n        center.requestAuthorization(options: [.alert, .sound, .badge]) { [weak self] granted, error in
             Task { @MainActor in
                 guard let self else { return }
                 guard self.activeRunID == runID else { return }
