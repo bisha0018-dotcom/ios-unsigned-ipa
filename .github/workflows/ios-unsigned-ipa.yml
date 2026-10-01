@@ -43,10 +43,29 @@ jobs:
           test -d "$APP_PATH"
           mkdir -p "$IPA_ROOT/Payload"
           cp -R "$APP_PATH" "$IPA_ROOT/Payload/"
-          (cd "$IPA_ROOT" && /usr/bin/zip -qry "$IPA_PATH" Payload)
+          (cd "$IPA_ROOT" && /usr/bin/zip -r -X "$IPA_PATH" Payload)
 
           unzip -t "$IPA_PATH"
-          unzip -Z1 "$IPA_PATH" | grep -Fxq 'Payload/NotificationBlaster.app/Info.plist'
+          echo "IPA ZIP listing:"
+          unzip -l "$IPA_PATH"
+
+          VERIFY_ROOT="$RUNNER_TEMP/NotificationBlasterIPAVerification"
+          mkdir -p "$VERIFY_ROOT"
+          unzip -o "$IPA_PATH" 'Payload/NotificationBlaster.app/PkgInfo' -d "$VERIFY_ROOT"
+          PKGINFO_PATH="$VERIFY_ROOT/Payload/NotificationBlaster.app/PkgInfo"
+          test -f "$PKGINFO_PATH"
+          test ! -L "$PKGINFO_PATH"
+          PKGINFO_BYTES="$(wc -c < "$PKGINFO_PATH" | tr -d '[:space:]')"
+          test "$PKGINFO_BYTES" -eq 8
+          PKGINFO_PREFIX="$(head -c 4 "$PKGINFO_PATH")"
+          test "$PKGINFO_PREFIX" = "APPL"
+          PKGINFO_CREATOR_HEX="$(od -An -tx1 -j 4 -N 4 "$PKGINFO_PATH" | tr -d '[:space:]')"
+          test "${#PKGINFO_CREATOR_HEX}" -eq 8
+          echo "PkgInfo byte count: $PKGINFO_BYTES"
+          echo "PkgInfo contents: APPL followed by creator/type bytes $PKGINFO_CREATOR_HEX"
+
+          unzip -p "$IPA_PATH" 'Payload/NotificationBlaster.app/Info.plist' > "$VERIFY_ROOT/Info.plist"
+          test -f "$VERIFY_ROOT/Info.plist"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
