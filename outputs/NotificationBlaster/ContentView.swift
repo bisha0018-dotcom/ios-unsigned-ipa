@@ -8,7 +8,8 @@ final class Blaster: ObservableObject {
     @Published var scheduledCount = 0
     @Published var status = "Ready"
 
-    private let center = UNUserNotificationCenter.current()\n    private let notificationCategory = "ORDER_SIMULATOR"
+    private let center = UNUserNotificationCenter.current()
+    private let notificationCategory = "ORDER_SIMULATOR"
     private var identifiers: [String] = []
     private let queueSize = 60
     private var activeRunID: UUID?
