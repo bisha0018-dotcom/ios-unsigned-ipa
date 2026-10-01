@@ -21,6 +21,7 @@ jobs:
         run: |
           mkdir -p AppIcon.xcassets/AppIcon.appiconset
           mkdir -p AppIcon.xcassets/AppIconPreview.imageset
+          mkdir -p NotificationContentExtension
 
           base64 -D -i AppIconSource/icon96.png.b64 -o AppIconSource/icon96.png
 
