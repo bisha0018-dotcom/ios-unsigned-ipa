@@ -81,7 +81,7 @@ final class Blaster: ObservableObject {
     ) {
         let startingOrder = Int(orderNumber) ?? 1001
         let itemWord = itemCount == 1 ? "item" : "items"
-        let body = "$\(amount), \(itemCount) \(itemWord) from \(store)"
+        let body = "$\(amount), \(itemCount) \(itemWord) from Online Store • \(store)"
 
         let runIDs = (0..<queueSize).map { _ in UUID().uuidString }
         identifiers = runIDs
@@ -122,7 +122,7 @@ struct ContentView: View {
     @State private var orderNumber = "1001"
     @State private var amount = "249.98"
     @State private var itemCount = "2"
-    @State private var store = "Paya Ecom"
+    @State private var store = "Ecom Paya"
 
     private var minimum: Double { Double(minimumDelay) ?? 0 }
     private var maximum: Double { Double(maximumDelay) ?? 0 }
@@ -202,7 +202,7 @@ struct ContentView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Order #\(orderNumber.isEmpty ? "1001" : orderNumber)")
                             .font(.headline)
-                        Text("$\(amount.isEmpty ? "249.98" : amount), \(items == 1 ? "1 item" : "\(items) items") from \(store.isEmpty ? "Paya Ecom" : store)")
+                        Text("$\(amount.isEmpty ? "249.98" : amount), \(items == 1 ? "1 item" : "\(items) items") from \(store.isEmpty ? "Ecom Paya" : store)")
                             .font(.subheadline)
                     }
                     .padding(16)
