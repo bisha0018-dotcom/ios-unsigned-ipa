@@ -75,7 +75,8 @@ jobs:
       - name: Prepare notification sound
         working-directory: outputs/NotificationBlaster
         run: |
-          base64 -D -i NotificationSoundSource/shopify_sale_sound.wav.b64 -o NotificationSoundSource/shopify_sale_sound.caf
+          mkdir -p NotificationSoundSource
+          afconvert "$GITHUB_WORKSPACE/shopify_sale_sound.mp3" NotificationSoundSource/shopify_sale_sound.caf -f caff -d ima4 -v
           file NotificationSoundSource/shopify_sale_sound.caf
 
       - name: Show Xcode version
@@ -144,4 +145,4 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-# Custom notification sound is bundled in the app bundle after the unsigned build.
+# Custom notification sound is converted from the original uploaded MP3 and bundled in the app.
