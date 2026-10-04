@@ -24,7 +24,7 @@ final class Blaster: ObservableObject {
 
     private let center = UNUserNotificationCenter.current()
     private let notificationCategory = "ORDER_SIMULATOR"
-    private let customSoundName = UNNotificationSoundName("shopify_sale_sound.wav")
+    private let customSoundName = UNNotificationSoundName("shopify_sale_sound.caf")
     private var identifiers: [String] = []
     private let queueSize = 63
     private var activeRunID: UUID?
