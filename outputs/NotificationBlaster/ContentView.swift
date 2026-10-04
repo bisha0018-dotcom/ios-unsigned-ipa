@@ -2,6 +2,20 @@ import SwiftUI
 import Combine
 import UserNotifications
 
+struct DeliveryMode: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let minimum: Double
+    let maximum: Double
+
+    static let modes: [DeliveryMode] = [
+        .init(id: "normal", title: "Normal", minimum: 0.5, maximum: 2.5),
+        .init(id: "fast", title: "Fast", minimum: 0.35, maximum: 1.25),
+        .init(id: "faster", title: "Faster", minimum: 0.20, maximum: 0.75),
+        .init(id: "turbo", title: "Turbo", minimum: 0.10, maximum: 0.40)
+    ]
+}
+
 @MainActor
 final class Blaster: ObservableObject {
     @Published var isRunning = false
@@ -11,21 +25,22 @@ final class Blaster: ObservableObject {
     private let center = UNUserNotificationCenter.current()
     private let notificationCategory = "ORDER_SIMULATOR"
     private var identifiers: [String] = []
-    private let queueSize = 60
+    // Keep below iOS's practical pending-local-notification ceiling.
+    private let queueSize = 63
     private var activeRunID: UUID?
 
     func start(minimum: Double, maximum: Double, orderNumber: String, amount: String, itemCount: Int, store: String) {
         guard !isRunning else { return }
         guard minimum > 0, maximum >= minimum else {
-            status = "Enter valid delay values."
+            status = "Choose a valid delivery mode."
             return
         }
 
         let order = orderNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         let price = amount.trimmingCharacters(in: .whitespacesAndNewlines)
-        let domain = store.trimmingCharacters(in: .whitespacesAndNewlines)
+        let storeName = store.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard !order.isEmpty, !price.isEmpty, !domain.isEmpty, itemCount > 0 else {
+        guard !order.isEmpty, !price.isEmpty, !storeName.isEmpty, itemCount > 0 else {
             status = "Fill in the order, amount, items, and store."
             return
         }
@@ -49,15 +64,7 @@ final class Blaster: ObservableObject {
                     self.status = error?.localizedDescription ?? "Allow notifications in Settings to start."
                     return
                 }
-                self.schedule(
-                    runID: runID,
-                    minimum: minimum,
-                    maximum: maximum,
-                    orderNumber: order,
-                    amount: price,
-                    itemCount: itemCount,
-                    store: domain
-                )
+                self.schedule(runID: runID, minimum: minimum, maximum: maximum, orderNumber: order, amount: price, itemCount: itemCount, store: storeName)
             }
         }
     }
@@ -70,15 +77,7 @@ final class Blaster: ObservableObject {
         status = "Stopped. Pending notifications cancelled."
     }
 
-    private func schedule(
-        runID: UUID,
-        minimum: Double,
-        maximum: Double,
-        orderNumber: String,
-        amount: String,
-        itemCount: Int,
-        store: String
-    ) {
+    private func schedule(runID: UUID, minimum: Double, maximum: Double, orderNumber: String, amount: String, itemCount: Int, store: String) {
         let startingOrder = Int(orderNumber) ?? 1001
         let itemWord = itemCount == 1 ? "item" : "items"
         let body = "$\(amount), \(itemCount) \(itemWord) from Online Store • \(store)"
@@ -95,8 +94,9 @@ final class Blaster: ObservableObject {
             content.title = "Order #\(startingOrder + index)"
             content.body = body
             content.sound = .default
+            content.categoryIdentifier = notificationCategory
 
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: elapsed, repeats: false)
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(elapsed, 0.1), repeats: false)
             let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
 
             center.add(request) { [weak self] error in
@@ -117,17 +117,15 @@ final class Blaster: ObservableObject {
 
 struct ContentView: View {
     @StateObject private var blaster = Blaster()
-    @State private var minimumDelay = "0.5"
-    @State private var maximumDelay = "2.5"
-    @State private var orderNumber = "1001"
-    @State private var amount = "249.98"
-    @State private var itemCount = "2"
-    @State private var store = "Ecom Paya"
 
-    private var minimum: Double { Double(minimumDelay) ?? 0 }
-    private var maximum: Double { Double(maximumDelay) ?? 0 }
+    @AppStorage("orderNumber") private var orderNumber = "1001"
+    @AppStorage("amount") private var amount = "249.98"
+    @AppStorage("itemCount") private var itemCount = "2"
+    @AppStorage("store") private var store = "Ecom Paya"
+    @AppStorage("deliveryMode") private var deliveryModeID = "normal"
+
     private var items: Int { Int(itemCount) ?? 0 }
-    private var validDelays: Bool { minimum > 0 && maximum >= minimum }
+    private var deliveryMode: DeliveryMode { DeliveryMode.modes.first(where: { $0.id == deliveryModeID }) ?? DeliveryMode.modes[0] }
 
     var body: some View {
         ScrollView {
@@ -153,14 +151,7 @@ struct ContentView: View {
                     if blaster.isRunning {
                         blaster.stop()
                     } else {
-                        blaster.start(
-                            minimum: minimum,
-                            maximum: maximum,
-                            orderNumber: orderNumber,
-                            amount: amount,
-                            itemCount: items,
-                            store: store
-                        )
+                        blaster.start(minimum: deliveryMode.minimum, maximum: deliveryMode.maximum, orderNumber: orderNumber, amount: amount, itemCount: items, store: store)
                     }
                 } label: {
                     HStack(spacing: 12) {
@@ -171,12 +162,9 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 64)
                     .foregroundStyle(.white)
-                    .background(
-                        blaster.isRunning ? Color.red : Color.green,
-                        in: RoundedRectangle(cornerRadius: 20)
-                    )
+                    .background(blaster.isRunning ? Color.red : Color.green, in: RoundedRectangle(cornerRadius: 20))
                 }
-                .disabled(!blaster.isRunning && (!validDelays || items <= 0))
+                .disabled(!blaster.isRunning && items <= 0)
 
                 section("ORDER NOTIFICATION") {
                     formRow("Order number", text: $orderNumber)
@@ -185,13 +173,27 @@ struct ContentView: View {
                     Divider()
                     formRow("Items", text: $itemCount)
                     Divider()
-                    formRow("Store / domain", text: $store)
+                    formRow("Store name", text: $store)
                 }
 
-                section("DELIVERY") {
-                    formRow("Minimum delay", text: $minimumDelay, suffix: "sec")
-                    Divider()
-                    formRow("Maximum delay", text: $maximumDelay, suffix: "sec")
+                section("DELIVERY MODE") {
+                    Picker("Speed", selection: $deliveryModeID) {
+                        ForEach(DeliveryMode.modes) { mode in
+                            Text(mode.title).tag(mode.id)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.vertical, 14)
+
+                    HStack {
+                        Text(deliveryMode.title)
+                            .font(.subheadline.bold())
+                        Spacer()
+                        Text(String(format: "%.2f–%.2f sec", deliveryMode.minimum, deliveryMode.maximum))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.bottom, 14)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -202,7 +204,7 @@ struct ContentView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Order #\(orderNumber.isEmpty ? "1001" : orderNumber)")
                             .font(.headline)
-                        Text("$\(amount.isEmpty ? "249.98" : amount), \(items == 1 ? "1 item" : "\(items) items") from \(store.isEmpty ? "Ecom Paya" : store)")
+                        Text("$\(amount.isEmpty ? "249.98" : amount), \(items == 1 ? "1 item" : "\(items) items") from Online Store • \(store.isEmpty ? "Ecom Paya" : store)")
                             .font(.subheadline)
                     }
                     .padding(16)
@@ -216,7 +218,7 @@ struct ContentView: View {
                     Text("scheduled")
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text("60 per run")
+                    Text("63 per run")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -247,12 +249,9 @@ struct ContentView: View {
                 .font(.caption.bold())
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 8)
-
-            VStack(spacing: 0) {
-                content()
-            }
-            .padding(.horizontal, 16)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+            VStack(spacing: 0) { content() }
+                .padding(.horizontal, 16)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
         }
     }
 
@@ -260,21 +259,12 @@ struct ContentView: View {
         HStack {
             Text(title)
             Spacer()
-
-            if let prefix {
-                Text(prefix)
-                    .foregroundStyle(.secondary)
-            }
-
+            if let prefix { Text(prefix).foregroundStyle(.secondary) }
             TextField(title, text: text)
-                .keyboardType(title == "Order number" || title == "Store / domain" ? .default : .decimalPad)
+                .keyboardType(title == "Store name" ? .default : .decimalPad)
                 .multilineTextAlignment(.trailing)
                 .frame(width: 130)
-
-            if let suffix {
-                Text(suffix)
-                    .foregroundStyle(.secondary)
-            }
+            if let suffix { Text(suffix).foregroundStyle(.secondary) }
         }
         .padding(.vertical, 15)
     }
