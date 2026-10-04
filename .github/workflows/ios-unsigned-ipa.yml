@@ -72,6 +72,12 @@ jobs:
           }
           EOF
 
+      - name: Prepare notification sound
+        working-directory: outputs/NotificationBlaster
+        run: |
+          base64 -D -i NotificationSoundSource/shopify_sale_sound.wav.b64 -o NotificationSoundSource/shopify_sale_sound.wav
+          file NotificationSoundSource/shopify_sale_sound.wav
+
       - name: Show Xcode version
         run: xcodebuild -version
 
