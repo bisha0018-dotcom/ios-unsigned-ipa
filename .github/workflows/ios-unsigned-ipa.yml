@@ -94,9 +94,8 @@ jobs:
         working-directory: outputs/NotificationBlaster
         run: |
           APP_PATH="$RUNNER_TEMP/NotificationBlasterDerivedData/Build/Products/Release-iphoneos/NotificationBlaster.app"
-          mkdir -p "$APP_PATH/Library/Sounds"
-          cp NotificationSoundSource/shopify_sale_sound.caf "$APP_PATH/Library/Sounds/shopify_sale_sound.caf"
-          test -f "$APP_PATH/Library/Sounds/shopify_sale_sound.caf"
+          cp NotificationSoundSource/shopify_sale_sound.wav "$APP_PATH/shopify_sale_sound.wav"
+          test -f "$APP_PATH/shopify_sale_sound.wav"
 
       - name: Package unsigned IPA
         working-directory: outputs/NotificationBlaster
@@ -139,4 +138,4 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-# Custom notification sound is bundled after the unsigned build.
+# Custom notification sound is bundled in the app bundle after the unsigned build.
