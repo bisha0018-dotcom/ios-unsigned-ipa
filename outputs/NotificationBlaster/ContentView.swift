@@ -29,7 +29,7 @@ final class Blaster: ObservableObject {
     private let queueSize = 63
     private var activeRunID: UUID?
 
-    func start(minimum: Double, maximum: Double, orderNumber: String, amount: String, itemCount: Int, store: String) {
+    func start(mode: DeliveryMode, orderNumber: String, amount: String, itemCount: Int, store: String) {
         guard !isRunning else { return }
         guard minimum > 0, maximum >= minimum else {
             status = "Choose a valid delivery mode."
@@ -113,6 +113,32 @@ final class Blaster: ObservableObject {
             }
         }
     }
+}
+
+enum DeliveryMode: String, CaseIterable, Identifiable {
+    case normal = "Normal"
+    case fast = "Fast"
+    case faster = "Faster"
+    case rapid = "Rapid"
+
+    var id: String { rawValue }
+    var minimum: Double {
+        switch self {
+        case .normal: return 0.5
+        case .fast: return 0.3
+        case .faster: return 0.15
+        case .rapid: return 0.1
+        }
+    }
+    var maximum: Double {
+        switch self {
+        case .normal: return 2.5
+        case .fast: return 1.2
+        case .faster: return 0.7
+        case .rapid: return 0.4
+        }
+    }
+    var rangeText: String { "\(minimum, specifier: "%.2g")–\(maximum, specifier: "%.2g") sec" }
 }
 
 struct ContentView: View {
