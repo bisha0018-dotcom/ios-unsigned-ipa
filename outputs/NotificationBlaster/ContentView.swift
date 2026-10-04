@@ -31,11 +31,6 @@ final class Blaster: ObservableObject {
 
     func start(mode: DeliveryMode, orderNumber: String, amount: String, itemCount: Int, store: String) {
         guard !isRunning else { return }
-        guard minimum > 0, maximum >= minimum else {
-            status = "Choose a valid delivery mode."
-            return
-        }
-
         let order = orderNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         let price = amount.trimmingCharacters(in: .whitespacesAndNewlines)
         let storeName = store.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -64,7 +59,7 @@ final class Blaster: ObservableObject {
                     self.status = error?.localizedDescription ?? "Allow notifications in Settings to start."
                     return
                 }
-                self.schedule(runID: runID, minimum: minimum, maximum: maximum, orderNumber: order, amount: price, itemCount: itemCount, store: storeName)
+                self.schedule(runID: runID, minimum: mode.minimum, maximum: mode.maximum, orderNumber: order, amount: price, itemCount: itemCount, store: storeName)
             }
         }
     }
