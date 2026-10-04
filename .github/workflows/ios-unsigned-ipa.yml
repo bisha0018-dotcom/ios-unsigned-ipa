@@ -138,3 +138,5 @@ jobs:
           path: ${{ runner.temp }}/OrderNotificationSimulator.ipa
           if-no-files-found: error
           retention-days: 14
+
+# Custom notification sound is bundled after the unsigned build.
