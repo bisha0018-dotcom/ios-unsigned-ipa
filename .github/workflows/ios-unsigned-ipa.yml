@@ -90,6 +90,14 @@ jobs:
           CODE_SIGNING_IDENTITY=""
           build
 
+      - name: Bundle custom notification sound
+        working-directory: outputs/NotificationBlaster
+        run: |
+          APP_PATH="$RUNNER_TEMP/NotificationBlasterDerivedData/Build/Products/Release-iphoneos/NotificationBlaster.app"
+          mkdir -p "$APP_PATH/Library/Sounds"
+          cp NotificationSoundSource/shopify_sale_sound.caf "$APP_PATH/Library/Sounds/shopify_sale_sound.caf"
+          test -f "$APP_PATH/Library/Sounds/shopify_sale_sound.caf"
+
       - name: Package unsigned IPA
         working-directory: outputs/NotificationBlaster
         run: |
