@@ -10,9 +10,9 @@ struct DeliveryMode: Identifiable, Hashable {
 
     static let modes: [DeliveryMode] = [
         .init(id: "normal", title: "Normal", minimum: 0.5, maximum: 2.5),
-        .init(id: "fast", title: "Fast", minimum: 0.35, maximum: 1.25),
-        .init(id: "faster", title: "Faster", minimum: 0.20, maximum: 0.75),
-        .init(id: "turbo", title: "Turbo", minimum: 0.10, maximum: 0.40)
+        .init(id: "fast", title: "Fast", minimum: 0.3, maximum: 1.2),
+        .init(id: "faster", title: "Faster", minimum: 0.15, maximum: 0.7),
+        .init(id: "rapid", title: "Rapid", minimum: 0.1, maximum: 0.4)
     ]
 }
 
@@ -24,13 +24,14 @@ final class Blaster: ObservableObject {
 
     private let center = UNUserNotificationCenter.current()
     private let notificationCategory = "ORDER_SIMULATOR"
+    private let customSoundName = UNNotificationSoundName("shopify_sale_sound.caf")
     private var identifiers: [String] = []
-    // Keep below iOS's practical pending-local-notification ceiling.
     private let queueSize = 63
     private var activeRunID: UUID?
 
     func start(mode: DeliveryMode, orderNumber: String, amount: String, itemCount: Int, store: String) {
         guard !isRunning else { return }
+
         let order = orderNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         let price = amount.trimmingCharacters(in: .whitespacesAndNewlines)
         let storeName = store.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -53,13 +54,23 @@ final class Blaster: ObservableObject {
             Task { @MainActor in
                 guard let self else { return }
                 guard self.activeRunID == runID else { return }
+
                 guard granted else {
                     self.isRunning = false
                     self.activeRunID = nil
                     self.status = error?.localizedDescription ?? "Allow notifications in Settings to start."
                     return
                 }
-                self.schedule(runID: runID, minimum: mode.minimum, maximum: mode.maximum, orderNumber: order, amount: price, itemCount: itemCount, store: storeName)
+
+                self.schedule(
+                    runID: runID,
+                    minimum: mode.minimum,
+                    maximum: mode.maximum,
+                    orderNumber: order,
+                    amount: price,
+                    itemCount: itemCount,
+                    store: storeName
+                )
             }
         }
     }
@@ -72,7 +83,15 @@ final class Blaster: ObservableObject {
         status = "Stopped. Pending notifications cancelled."
     }
 
-    private func schedule(runID: UUID, minimum: Double, maximum: Double, orderNumber: String, amount: String, itemCount: Int, store: String) {
+    private func schedule(
+        runID: UUID,
+        minimum: Double,
+        maximum: Double,
+        orderNumber: String,
+        amount: String,
+        itemCount: Int,
+        store: String
+    ) {
         let startingOrder = Int(orderNumber) ?? 1001
         let itemWord = itemCount == 1 ? "item" : "items"
         let body = "$\(amount), \(itemCount) \(itemWord) from Online Store • \(store)"
@@ -83,21 +102,32 @@ final class Blaster: ObservableObject {
         status = "Queued 0 of \(queueSize)"
 
         var elapsed = 0.0
+
         for (index, identifier) in runIDs.enumerated() {
             elapsed += Double.random(in: minimum...maximum)
+
             let content = UNMutableNotificationContent()
             content.title = "Order #\(startingOrder + index)"
             content.body = body
-            content.sound = .default
+            content.sound = UNNotificationSound(named: customSoundName)
             content.categoryIdentifier = notificationCategory
 
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(elapsed, 0.1), repeats: false)
-            let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: max(elapsed, 0.1),
+                repeats: false
+            )
+
+            let request = UNNotificationRequest(
+                identifier: identifier,
+                content: content,
+                trigger: trigger
+            )
 
             center.add(request) { [weak self] error in
                 Task { @MainActor in
                     guard let self else { return }
                     guard self.activeRunID == runID else { return }
+
                     if error == nil {
                         self.scheduledCount += 1
                         self.status = "Queued \(self.scheduledCount) of \(self.queueSize)"
@@ -110,32 +140,6 @@ final class Blaster: ObservableObject {
     }
 }
 
-enum DeliveryMode: String, CaseIterable, Identifiable {
-    case normal = "Normal"
-    case fast = "Fast"
-    case faster = "Faster"
-    case rapid = "Rapid"
-
-    var id: String { rawValue }
-    var minimum: Double {
-        switch self {
-        case .normal: return 0.5
-        case .fast: return 0.3
-        case .faster: return 0.15
-        case .rapid: return 0.1
-        }
-    }
-    var maximum: Double {
-        switch self {
-        case .normal: return 2.5
-        case .fast: return 1.2
-        case .faster: return 0.7
-        case .rapid: return 0.4
-        }
-    }
-    var rangeText: String { "\(minimum, specifier: "%.2g")–\(maximum, specifier: "%.2g") sec" }
-}
-
 struct ContentView: View {
     @StateObject private var blaster = Blaster()
 
@@ -146,7 +150,9 @@ struct ContentView: View {
     @AppStorage("deliveryMode") private var deliveryModeID = "normal"
 
     private var items: Int { Int(itemCount) ?? 0 }
-    private var deliveryMode: DeliveryMode { DeliveryMode.modes.first(where: { $0.id == deliveryModeID }) ?? DeliveryMode.modes[0] }
+    private var deliveryMode: DeliveryMode {
+        DeliveryMode.modes.first(where: { $0.id == deliveryModeID }) ?? DeliveryMode.modes[0]
+    }
 
     var body: some View {
         ScrollView {
@@ -172,7 +178,13 @@ struct ContentView: View {
                     if blaster.isRunning {
                         blaster.stop()
                     } else {
-                        blaster.start(minimum: deliveryMode.minimum, maximum: deliveryMode.maximum, orderNumber: orderNumber, amount: amount, itemCount: items, store: store)
+                        blaster.start(
+                            mode: deliveryMode,
+                            orderNumber: orderNumber,
+                            amount: amount,
+                            itemCount: items,
+                            store: store
+                        )
                     }
                 } label: {
                     HStack(spacing: 12) {
@@ -183,7 +195,10 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 64)
                     .foregroundStyle(.white)
-                    .background(blaster.isRunning ? Color.red : Color.green, in: RoundedRectangle(cornerRadius: 20))
+                    .background(
+                        blaster.isRunning ? Color.red : Color.green,
+                        in: RoundedRectangle(cornerRadius: 20)
+                    )
                 }
                 .disabled(!blaster.isRunning && items <= 0)
 
@@ -225,6 +240,7 @@ struct ContentView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Order #\(orderNumber.isEmpty ? "1001" : orderNumber)")
                             .font(.headline)
+
                         Text("$\(amount.isEmpty ? "249.98" : amount), \(items == 1 ? "1 item" : "\(items) items") from Online Store • \(store.isEmpty ? "Ecom Paya" : store)")
                             .font(.subheadline)
                     }
@@ -236,9 +252,12 @@ struct ContentView: View {
                 HStack {
                     Label("\(blaster.scheduledCount)", systemImage: "bell")
                         .font(.title3.bold())
+
                     Text("scheduled")
                         .foregroundStyle(.secondary)
+
                     Spacer()
+
                     Text("63 per run")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -264,28 +283,42 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func section<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
                 .font(.caption.bold())
                 .foregroundStyle(.secondary)
                 .padding(.bottom, 8)
-            VStack(spacing: 0) { content() }
-                .padding(.horizontal, 16)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
+
+            VStack(spacing: 0) {
+                content()
+            }
+            .padding(.horizontal, 16)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
         }
     }
 
-    private func formRow(_ title: String, text: Binding<String>, prefix: String? = nil, suffix: String? = nil) -> some View {
+    private func formRow(
+        _ title: String,
+        text: Binding<String>,
+        prefix: String? = nil
+    ) -> some View {
         HStack {
             Text(title)
             Spacer()
-            if let prefix { Text(prefix).foregroundStyle(.secondary) }
+
+            if let prefix {
+                Text(prefix)
+                    .foregroundStyle(.secondary)
+            }
+
             TextField(title, text: text)
                 .keyboardType(title == "Store name" ? .default : .decimalPad)
                 .multilineTextAlignment(.trailing)
                 .frame(width: 130)
-            if let suffix { Text(suffix).foregroundStyle(.secondary) }
         }
         .padding(.vertical, 15)
     }
