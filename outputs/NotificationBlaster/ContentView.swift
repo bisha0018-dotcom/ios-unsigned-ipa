@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import UserNotifications
+import WebKit
 
 struct DeliveryMode: Identifiable, Hashable {
     let id: String
@@ -140,7 +141,83 @@ final class Blaster: ObservableObject {
     }
 }
 
+
 struct ContentView: View {
+    @State private var showNotificationSimulator = false
+
+    var body: some View {
+        DashboardWebView {
+            showNotificationSimulator = true
+        }
+        .ignoresSafeArea()
+        .sheet(isPresented: $showNotificationSimulator) {
+            NavigationStack {
+                NotificationSimulatorView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Back to dashboard") {
+                                showNotificationSimulator = false
+                            }
+                        }
+                    }
+            }
+            .preferredColorScheme(.light)
+        }
+    }
+}
+
+private struct DashboardWebView: UIViewRepresentable {
+    let onOpenSimulator: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onOpenSimulator: onOpenSimulator)
+    }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let controller = WKUserContentController()
+        controller.add(context.coordinator, name: "openNotificationSimulator")
+        let script = """
+        document.addEventListener('click', function(event) {
+          const button = event.target && event.target.closest
+            ? event.target.closest('button[aria-label="Menu"], button[aria-label="Open menu"]')
+            : null;
+          if (button) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            window.webkit.messageHandlers.openNotificationSimulator.postMessage('open');
+          }
+        }, true);
+        """
+        controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        let config = WKWebViewConfiguration()
+        config.userContentController = controller
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.isOpaque = false
+        webView.backgroundColor = UIColor.black
+        webView.scrollView.backgroundColor = UIColor.black
+
+        if let dashboardURL = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "Dashboard") {
+            webView.loadFileURL(dashboardURL, allowingReadAccessTo: dashboardURL.deletingLastPathComponent())
+        } else {
+            let html = "<html><body style='font-family:-apple-system;background:#111;color:white;padding:24px'><h2>Dashboard unavailable</h2><p>The dashboard files were not included in this build.</p></body></html>"
+            webView.loadHTMLString(html, baseURL: nil)
+        }
+        return webView
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {}
+
+    final class Coordinator: NSObject, WKScriptMessageHandler {
+        let onOpenSimulator: () -> Void
+        init(onOpenSimulator: @escaping () -> Void) { self.onOpenSimulator = onOpenSimulator }
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard message.name == "openNotificationSimulator" else { return }
+            DispatchQueue.main.async { self.onOpenSimulator() }
+        }
+    }
+}
+
+struct NotificationSimulatorView: View {
     @StateObject private var blaster = Blaster()
 
     @AppStorage("orderNumber") private var orderNumber = "1001"
