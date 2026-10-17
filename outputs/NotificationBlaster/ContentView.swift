@@ -179,7 +179,7 @@ private struct DashboardWebView: UIViewRepresentable {
         let script = """
         document.addEventListener('click', function(event) {
           const button = event.target && event.target.closest
-            ? event.target.closest('button[aria-label="Menu"], button[aria-label="Open menu"]')
+            ? event.target.closest('button[aria-label*="menu" i], [role="button"][aria-label*="menu" i]')
             : null;
           if (button) {
             event.preventDefault();
@@ -191,16 +191,15 @@ private struct DashboardWebView: UIViewRepresentable {
         controller.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         let config = WKWebViewConfiguration()
         config.userContentController = controller
+        config.setURLSchemeHandler(DashboardSchemeHandler(), forURLScheme: "larptom")
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.isOpaque = false
-        webView.backgroundColor = UIColor.black
-        webView.scrollView.backgroundColor = UIColor.black
+        webView.backgroundColor = UIColor(red: 0.06, green: 0.07, blue: 0.09, alpha: 1)
+        webView.scrollView.backgroundColor = webView.backgroundColor
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
 
-        if let dashboardURL = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "Dashboard") {
-            webView.loadFileURL(dashboardURL, allowingReadAccessTo: dashboardURL.deletingLastPathComponent())
-        } else {
-            let html = "<html><body style='font-family:-apple-system;background:#111;color:white;padding:24px'><h2>Dashboard unavailable</h2><p>The dashboard files were not included in this build.</p></body></html>"
-            webView.loadHTMLString(html, baseURL: nil)
+        if let url = URL(string: "larptom://bundle/index.html") {
+            webView.load(URLRequest(url: url))
         }
         return webView
     }
@@ -215,6 +214,64 @@ private struct DashboardWebView: UIViewRepresentable {
             DispatchQueue.main.async { self.onOpenSimulator() }
         }
     }
+}
+
+private final class DashboardSchemeHandler: NSObject, WKURLSchemeHandler {
+    func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
+        guard let url = urlSchemeTask.request.url else {
+            urlSchemeTask.didFailWithError(URLError(.badURL))
+            return
+        }
+
+        let pathParts = url.path.split(separator: "/").map(String.init)
+        guard !pathParts.isEmpty,
+              pathParts.allSatisfy({ $0 != "." && $0 != ".." }),
+              let fileName = pathParts.last else {
+            urlSchemeTask.didFailWithError(URLError(.fileDoesNotExist))
+            return
+        }
+
+        let subdirectory = pathParts.count > 1
+            ? "Dashboard/" + pathParts.dropLast().joined(separator: "/")
+            : "Dashboard"
+
+        guard let fileURL = Bundle.main.url(forResource: fileName, withExtension: nil, subdirectory: subdirectory),
+              let data = try? Data(contentsOf: fileURL) else {
+            urlSchemeTask.didFailWithError(URLError(.fileDoesNotExist))
+            return
+        }
+
+        let ext = fileURL.pathExtension.lowercased()
+        let mime: String
+        switch ext {
+        case "html": mime = "text/html"
+        case "js", "mjs": mime = "application/javascript"
+        case "css": mime = "text/css"
+        case "json", "geojson": mime = "application/json"
+        case "svg": mime = "image/svg+xml"
+        case "png": mime = "image/png"
+        case "jpg", "jpeg": mime = "image/jpeg"
+        case "webp": mime = "image/webp"
+        case "mp3": mime = "audio/mpeg"
+        case "woff": mime = "font/woff"
+        case "woff2": mime = "font/woff2"
+        case "ttf": mime = "font/ttf"
+        case "otf": mime = "font/otf"
+        default: mime = "application/octet-stream"
+        }
+
+        let response = URLResponse(
+            url: url,
+            mimeType: mime,
+            expectedContentLength: data.count,
+            textEncodingName: ext == "html" || ext == "js" || ext == "mjs" || ext == "css" || ext == "json" ? "utf-8" : nil
+        )
+        urlSchemeTask.didReceive(response)
+        urlSchemeTask.didReceive(data)
+        urlSchemeTask.didFinish()
+    }
+
+    func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {}
 }
 
 struct NotificationSimulatorView: View {
