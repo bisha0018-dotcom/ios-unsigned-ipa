@@ -16,6 +16,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Build Larptom dashboard
+        run: |
+          unzip -q larptom-ios-dashboard.zip
+          cd larptom-ios-dashboard
+          npm install --no-audit --no-fund
+          npm run build
+
       - name: Prepare app icon
         working-directory: outputs/NotificationBlaster
         run: |
@@ -103,6 +110,14 @@ jobs:
           APP_PATH="$RUNNER_TEMP/NotificationBlasterDerivedData/Build/Products/Release-iphoneos/NotificationBlaster.app"
           cp NotificationSoundSource/shopify_sale_sound.caf "$APP_PATH/shopify_sale_sound.caf"
           test -f "$APP_PATH/shopify_sale_sound.caf"
+
+      - name: Bundle Larptom dashboard
+        run: |
+          APP_PATH="$RUNNER_TEMP/NotificationBlasterDerivedData/Build/Products/Release-iphoneos/NotificationBlaster.app"
+          test -f larptom-ios-dashboard/dist/index.html
+          mkdir -p "$APP_PATH/Dashboard"
+          cp -R larptom-ios-dashboard/dist/. "$APP_PATH/Dashboard/"
+          test -f "$APP_PATH/Dashboard/index.html"
 
       - name: Package unsigned IPA
         working-directory: outputs/NotificationBlaster
